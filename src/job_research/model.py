@@ -11,6 +11,7 @@ class Config:
     vault_path: Path
     companies_dir: Path
     references_dir: Path
+    automation_dir: Path
     discovery: dict[str, Any]
     updates: dict[str, Any]
     job_filters: dict[str, list[str]]

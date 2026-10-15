@@ -12,7 +12,7 @@ The company-research and job-discovery commands are independent. The tool does n
 - Writes are atomic. A failed fetch does not delete an existing archive.
 - If any source fails during a refresh, an existing research archive is preserved intact and the JSON result reports the failures.
 - `--dry-run` performs discovery but does not write.
-- `research-all` stops above 10 selected companies unless you explicitly raise `--limit`.
+- `research-all` processes at most `--limit` companies in one run. Repeat the command to process the next eligible companies; `--missing-only` skips companies with an existing research archive.
 - Downloaded text is treated as data. The tool does not execute scripts found on webpages.
 - The crawler respects `robots.txt`, uses a delay per domain, follows at most two link levels, and archives at most eight research pages by default.
 
@@ -76,7 +76,17 @@ Research companies that do not yet have an automated company-research archive:
 .venv/bin/python -m job_research research-all --missing-only --dry-run --limit 10
 ```
 
+`--limit` is the number of companies to process in this run. For example, run with `--limit 2` to process at most two companies, then repeat the same command. Once those two have research archives, `--missing-only` selects the next two. The JSON output reports the eligible count, processed count, and remaining count. With `--dry-run`, no archives are written, so repeating the command previews the same companies.
+
 The command emits structured JSON with discovered URLs, pages extracted, Playwright use, failures, postings found, and files that would be created or updated.
+
+Each non-dry-run `research-all` attempt is also appended immediately to `Automation/job-research-runs.jsonl` in the Obsidian tracker. The code repository contains no company-run data. Open `Automation/Job Research Runs.md` in Obsidian for the log location and usage. Show the accumulated failed attempts with:
+
+```sh
+.venv/bin/python -m job_research show-failures
+```
+
+Failed companies remain eligible for a later `--missing-only` run because a failed attempt does not create a company-research archive.
 
 ## Discovery and extraction
 

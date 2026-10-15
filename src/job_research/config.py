@@ -14,6 +14,7 @@ def load_config(path: str | Path) -> Config:
     vault = (configured_vault if configured_vault.is_absolute() else project_dir / configured_vault).resolve()
     companies = vault / raw.get("company_notes_directory", "Companies")
     references = vault / raw.get("references_directory", "References")
+    automation = vault / raw.get("automation_directory", "Automation")
     if not companies.is_dir():
         raise ValueError(f"Company notes directory does not exist: {companies}")
     if not references.is_dir():
@@ -23,6 +24,7 @@ def load_config(path: str | Path) -> Config:
         vault_path=vault,
         companies_dir=companies,
         references_dir=references,
+        automation_dir=automation,
         discovery=raw.get("discovery", {}),
         updates=raw.get("updates", {}),
         job_filters=raw.get("job_filters", {}),

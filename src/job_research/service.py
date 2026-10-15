@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 from urllib.parse import unquote, urlparse
 
 import yaml
@@ -122,10 +123,23 @@ def existing_job_links(config: Config, company: CompanyNote) -> list[str]:
     return links
 
 
-def research_company(config: Config, company: CompanyNote, *, include_jobs: bool = False, dry_run: bool = False) -> dict:
+Progress = Callable[[str], None]
+
+
+def research_company(
+    config: Config,
+    company: CompanyNote,
+    *,
+    include_jobs: bool = False,
+    dry_run: bool = False,
+    progress: Progress | None = None,
+) -> dict:
+    report = progress or (lambda _message: None)
     client = WebClient(config.discovery)
     try:
+        report("Discovering official website and research pages")
         official, careers, pages, failures = discover_research(company.name, [company.careers_url, company.primary_job_url], client)
+        report(f"Collected {len(pages)} research page(s); preparing archive")
         path = research_path(config, company.name)
         captured = now()
         page_paths = research_page_paths(config, company.name, pages)
@@ -137,22 +151,41 @@ def research_company(config: Config, company: CompanyNote, *, include_jobs: bool
         else:
             action = "unchanged" if path.exists() and path.read_text(encoding="utf-8") == content else ("update" if path.exists() else "create")
         if not dry_run and action != "preserve-existing-due-to-failures":
+            report("Writing research archive")
             for page_path, page_content in zip(page_paths, page_contents):
                 atomic_write(page_path, page_content)
             atomic_write(path, content)
         jobs_result = None
         if include_jobs:
-            jobs_result = find_jobs(config, company, client=client, dry_run=dry_run, extra_urls=[careers or "", official])
+            report("Discovering and verifying job postings")
+            jobs_result = find_jobs(
+                config,
+                company,
+                client=client,
+                dry_run=dry_run,
+                extra_urls=[careers or "", official],
+                progress=progress,
+            )
         links = existing_job_links(config, company)
         if jobs_result:
             links = jobs_result["links"]
+        report("Updating company note links")
         changed = update_generated_links(company, obsidian_link(config.vault_path, path, "Company research"), links, dry_run)
         return {"company": company.name, "official_website": official, "careers_page": careers, "pages": len(pages), "playwright_pages": sum(p.rendered for p in pages), "failures": failures, "research_file": str(path), "research_page_files": [str(page_path) for page_path in page_paths], "file_action": action, "note_links_changed": changed, "jobs": jobs_result, "dry_run": dry_run}
     finally:
         client.close()
 
 
-def find_jobs(config: Config, company: CompanyNote, *, client: WebClient | None = None, dry_run: bool = False, extra_urls: list[str] | None = None) -> dict:
+def find_jobs(
+    config: Config,
+    company: CompanyNote,
+    *,
+    client: WebClient | None = None,
+    dry_run: bool = False,
+    extra_urls: list[str] | None = None,
+    progress: Progress | None = None,
+) -> dict:
+    report = progress or (lambda _message: None)
     owns_client = client is None
     client = client or WebClient(config.discovery)
     try:
@@ -165,12 +198,15 @@ def find_jobs(config: Config, company: CompanyNote, *, client: WebClient | None 
             except Exception as exc:
                 discovery_failures.append(f"Careers-page discovery failed: {exc}")
         urls = list(dict.fromkeys(url for url in urls if url))
+        report("Finding the careers board")
         board = discover_board(urls, client)
         if board:
             provider, token = board
+            report(f"Fetching job list from {provider}")
             all_jobs = fetch_jobs(provider, token, client)
         else:
             provider, token = "generic-html", "official-careers-pages"
+            report("Searching official careers pages")
             all_jobs = fetch_generic_jobs(urls, client)
             if not all_jobs:
                 raise ValueError("No supported ATS or confidently identifiable job links were found. Availability remains unconfirmed.")
@@ -180,12 +216,14 @@ def find_jobs(config: Config, company: CompanyNote, *, client: WebClient | None 
             job for job in all_jobs
             if not job.metadata.get("title_confident") or title_matches(job, config.job_filters)
         ]
+        report(f"Verifying {len(candidates_to_verify)} candidate posting(s)")
         for job in candidates_to_verify:
             try:
                 verified.append(fill_description(job, client))
             except Exception as exc:
                 job_failures.append(f"{job.url}: {exc}")
         selected = [job for job in verified if matches(job, config.job_filters)]
+        report(f"Matched {len(selected)} posting(s); saving job references")
         links: list[str] = []
         actions: list[dict] = []
         captured = now()
