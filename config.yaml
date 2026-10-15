@@ -1,0 +1,50 @@
+# Paths are relative to this config, so the tool stays in ~/code while all
+# notes and generated research remain in the Obsidian tracker.
+vault_path: /Users/david/Library/CloudStorage/GoogleDrive-timewarptrio11@gmail.com/My Drive/DriveSyncFiles/PersonalVault/Obsidian Job Search Tracker
+company_notes_directory: Companies
+references_directory: References
+
+discovery:
+  max_research_pages: 8
+  max_link_depth: 2
+  http_timeout_seconds: 20
+  delay_seconds: 0.75
+  concurrency: 3
+  user_agent: "ObsidianJobResearch/0.1 (personal archival tool)"
+  obey_robots_txt: true
+  playwright_fallback: true
+  minimum_content_characters: 400
+
+updates:
+  refresh_existing_research: true
+  include_job_discovery: false
+
+job_filters:
+  title_include:
+    - software engineer
+    - backend engineer
+    - back-end engineer
+    - frontend engineer
+    - front-end engineer
+    - full stack engineer
+    - full-stack engineer
+    - platform engineer
+    - infrastructure engineer
+    - developer
+  title_exclude:
+    - manager
+    - director
+    - vice president
+    - vp
+    - intern
+    - internship
+    - new grad
+    - graduate
+    - principal
+    - distinguished
+  specializations: []
+  seniority_include: []
+  locations: []
+  arrangements: []
+  keywords: []
+
