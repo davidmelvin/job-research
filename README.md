@@ -4,6 +4,8 @@ This local Python tool lives in `~/code/job-research` and adds source archives t
 
 The company-research and job-discovery commands are independent. The tool does not use AI, a paid API, an external database, cloud hosting, or an Obsidian plugin.
 
+The Gmail intake reads only two configured accounts and requests only the `gmail.readonly` API scope. It stores OAuth and SQLite state under `~/Library/Application Support/job-research/gmail`, and writes a body-free append-only audit to `Automation/gmail-company-intake.jsonl`. It never opens email links. Authentication is per account, with a separate token for each account. Before running `gmail-auth`, enable the Gmail API in a Google Cloud project, create an OAuth client of type **Desktop app**, download its JSON, and place it at `~/Library/Application Support/job-research/gmail/oauth-client.json`; keep it private. The allowed accounts are `personal` (`davidmelvinjr@gmail.com`) and `work` (`davidmelvinwork@gmail.com`).
+
 ## Safety model
 
 - The tool never edits `Companies.base`, `Templates/`, ratings, statuses, assessments, or existing prose.
@@ -25,7 +27,7 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-The script locates Python 3.10 or newer, creates `.venv`, installs the Python package and test runner, downloads only Playwright Chromium, and runs a local headless-render check. It does not need administrator access. Set `JOB_RESEARCH_PYTHON=/path/to/python3` if the automatic Python search does not find your preferred interpreter.
+The script locates Python 3.10 or newer, creates `.venv`, installs the Python package with Gmail dependencies and pytest, downloads only Playwright Chromium, and runs a local headless-render check. It does not need administrator access. Set `JOB_RESEARCH_PYTHON=/path/to/python3` if the automatic Python search does not find your preferred interpreter. Existing environments created before this change can add Gmail dependencies with `.venv/bin/python -m pip install -e '.[gmail]'`.
 
 To update later:
 
@@ -38,6 +40,45 @@ To update later:
 ## Use
 
 Obsidian does not need to be open. Run commands from this folder. `config.yaml` points to the Obsidian tracker, so generated Markdown stays in the vault while the code and Python environment remain under `~/code`.
+
+Create a company note from `Templates/Company.md` without starting network research:
+
+```sh
+.venv/bin/python -m job_research add-company "Acme"
+```
+
+The command emits JSON with `created`, `already-exists`, or `conflict` status. It does not replace an existing note. After reviewing the new note, start research separately:
+
+```sh
+.venv/bin/python -m job_research research-company "Acme" --include-jobs
+```
+
+### Gmail company intake
+
+Authenticate each account and verify the returned address:
+
+```sh
+.venv/bin/python -m job_research gmail-auth personal
+.venv/bin/python -m job_research gmail-auth work
+```
+
+Preview an intake run. Dry-run reads matching messages but saves no candidate or checkpoint:
+
+```sh
+.venv/bin/python -m job_research gmail-intake personal --max-messages 500
+```
+
+Commit candidate records and the account checkpoint:
+
+```sh
+.venv/bin/python -m job_research gmail-intake personal --commit
+.venv/bin/python -m job_research gmail-candidates
+.venv/bin/python -m job_research gmail-candidates --format shell
+.venv/bin/python -m job_research gmail-candidates --key 'davidmelvinjr@gmail.com:MESSAGE_ID'
+.venv/bin/python -m job_research gmail-resolve 'davidmelvinjr@gmail.com:MESSAGE_ID' 'Employer Name'
+```
+
+Initial scans use a deliberate one-day Gmail overlap and filter messages by `internalDate` at 2026-10-05 00:00 America/New_York. Subsequent commits use Gmail history; an expired history ID triggers a bounded overlapping scan, deduplicated by account and message ID. If a run hits `--max-messages`, its report says `remaining: true`; repeat it to continue. Candidate storage omits bodies. Shell output only prints suggested commands; it does not run them. An employer without an unambiguous match remains unresolved. Direct outreach, job alerts, application/interview messages, unrelated mail, and unresolved messages have separate classifications.
 
 Preview company research:
 

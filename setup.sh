@@ -23,7 +23,7 @@ else
   "$PYTHON" -m venv .venv
 fi
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -e . pytest
+.venv/bin/python -m pip install -e '.[gmail]' pytest
 .venv/bin/python -m playwright install chromium
 .venv/bin/python -m job_research verify-playwright
 

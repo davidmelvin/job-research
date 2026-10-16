@@ -18,6 +18,38 @@ def make_config(root: Path, company_names: list[str]) -> Config:
     return Config(root, root, companies, references, automation, {}, {}, {})
 
 
+def test_add_company_copies_template_and_is_idempotent(monkeypatch, tmp_path: Path, capsys):
+    config = make_config(tmp_path, [])
+    template = config.vault_path / "Templates" / "Company.md"
+    template.parent.mkdir()
+    template.write_text("---\nrating: 1\n---\n\n# Company overview\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "load_config", lambda _: config)
+
+    assert cli.main(["add-company", "Acme"]) == 0
+    created = json.loads(capsys.readouterr().out)
+    assert created["status"] == "created"
+    note = config.companies_dir / "Acme.md"
+    assert note.read_text(encoding="utf-8") == template.read_text(encoding="utf-8")
+
+    note.write_text("keep this", encoding="utf-8")
+    assert cli.main(["add-company", "Acme"]) == 0
+    existing = json.loads(capsys.readouterr().out)
+    assert existing["status"] == "already-exists"
+    assert note.read_text(encoding="utf-8") == "keep this"
+
+
+def test_add_company_rejects_unsafe_and_case_insensitive_existing_name(monkeypatch, tmp_path: Path, capsys):
+    config = make_config(tmp_path, ["Acme"])
+    monkeypatch.setattr(cli, "load_config", lambda _: config)
+
+    assert cli.main(["add-company", "../Acme"]) == 1
+    assert json.loads(capsys.readouterr().out)["reason"] == "unsafe-filename"
+    assert cli.main(["add-company", "acme"]) == 0
+    existing = json.loads(capsys.readouterr().out)
+    assert existing["status"] == "already-exists"
+    assert existing["path"].endswith("Acme.md")
+
+
 def test_research_all_limit_processes_only_first_chunk(monkeypatch, tmp_path: Path, capsys):
     config = make_config(tmp_path, ["Alpha", "Bravo", "Charlie"])
     processed: list[str] = []

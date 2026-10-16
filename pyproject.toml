@@ -19,6 +19,12 @@ dependencies = [
 [project.scripts]
 job-research = "job_research.cli:main"
 
+[project.optional-dependencies]
+gmail = [
+  "google-api-python-client>=2.150,<3",
+  "google-auth-oauthlib>=1.2,<2",
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
